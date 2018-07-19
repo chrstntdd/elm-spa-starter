@@ -1,0 +1,22 @@
+{
+  "name": "elm-spa-starter",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "author": "Christian Todd <christian.todd7@gmail.com> (https://www.chrstntdd.com/)",
+  "license": "MIT",
+  "scripts": {
+    "start": "NODE_ENV=development node fuse.js dev",
+    "prod": "NODE_ENV=production node fuse.js prod"
+  },
+  "dependencies": {
+    "elm": "^0.18.0",
+    "elm-format": "^0.6.1-alpha",
+    "fuse-box": "^3.4.0",
+    "fuse-box-elm-plugin": "1.1.0",
+    "typescript": "^2.9.2",
+    "uglify-js": "^3.4.5"
+  },
+  "devDependencies": {
+    "express": "^4.16.3"
+  }
+}
