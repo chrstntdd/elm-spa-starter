@@ -1,7 +1,7 @@
 module Main exposing (..)
 
 import Html exposing (Attribute, Html, a, button, div, li, p, program, text, ul)
-import Html.Attributes exposing (class)
+import Html.Attributes exposing (attribute, class)
 import Html.Events exposing (onClick)
 import Navigation
 import Port exposing (..)
@@ -16,10 +16,18 @@ type alias LinkData msg =
     }
 
 
-link : LinkData Msg -> Html Msg
-link { url, attrs, label } =
+link : Route -> LinkData Msg -> Html Msg
+link route { url, attrs, label } =
+    let
+        a11yCurrent : List (Attribute msg)
+        a11yCurrent =
+            if route == url then
+                [ attribute "aria-current" "page" ]
+            else
+                []
+    in
     {- HELPER FUNCTION FOR SPA NAVIGATION -}
-    a (List.append attrs [ Routes.href url, onClickLink (NavigateTo url) ]) [ text label ]
+    a (attrs |> List.append [ Routes.href url, onClickLink (NavigateTo url) ] |> List.append a11yCurrent) [ text label ]
 
 
 
@@ -51,7 +59,7 @@ view model =
         appShell : List (Html Msg) -> Html Msg
         appShell children =
             div []
-                ([ navBar ] |> List.append children)
+                ([ navBar model.page ] |> List.append children)
     in
     case model.page of
         Routes.Home ->
@@ -82,17 +90,17 @@ counter count =
         ]
 
 
-navBar : Html Msg
-navBar =
+navBar : Route -> Html Msg
+navBar route =
     ul []
         [ li []
-            [ link { url = Routes.Home, attrs = [], label = "Home" } ]
+            [ link route { url = Routes.Home, attrs = [], label = "Home" } ]
         , li []
-            [ link { url = Routes.About, attrs = [], label = "About" } ]
+            [ link route { url = Routes.About, attrs = [], label = "About" } ]
         , li []
-            [ link { url = Routes.Projects, attrs = [], label = "Projects" } ]
+            [ link route { url = Routes.Projects, attrs = [], label = "Projects" } ]
         , li []
-            [ link { url = Routes.Contact, attrs = [], label = "Contact" } ]
+            [ link route { url = Routes.Contact, attrs = [], label = "Contact" } ]
         ]
 
 
