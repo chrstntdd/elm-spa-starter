@@ -1,12 +1,53 @@
 module Main exposing (..)
 
-import Html exposing (Attribute, Html, a, button, div, li, p, program, text, ul)
-import Html.Attributes exposing (attribute, class)
-import Html.Events exposing (onClick)
+import Html exposing (Attribute, Html, a, button, div, form, img, input, label, li, p, program, text, ul)
+import Html.Attributes exposing (attribute, autocomplete, class, for, href, id, src, target, type_)
+import Html.Events exposing (onClick, onInput, onSubmit)
+import Http
+import Json.Decode as D exposing (..)
+import Json.Decode.Pipeline exposing (decode, optional, required)
 import Navigation
 import Port exposing (..)
 import Routes exposing (Route)
 import Util exposing (onClickLink, unwrap)
+
+
+type alias GitHubAcct =
+    { avatar_url : String
+    , html_url : String
+    , location : Maybe String
+    }
+
+
+gitHubAcctDecoder : Decoder GitHubAcct
+gitHubAcctDecoder =
+    decode GitHubAcct
+        |> required "avatar_url" D.string
+        |> required "html_url" D.string
+        |> optional "location" (D.map Just D.string) Nothing
+
+
+gitHubRequest : String -> Http.Request GitHubAcct
+gitHubRequest username =
+    let
+        url =
+            "https://api.github.com/users/" ++ username
+    in
+    Http.get url gitHubAcctDecoder
+
+
+getGitHubAcct : String -> Cmd Msg
+getGitHubAcct username =
+    Http.send
+        (\res ->
+            case res of
+                Ok account ->
+                    GotGitHubAcct account
+
+                Err httpErr ->
+                    ShowHttpError httpErr
+        )
+        (gitHubRequest username)
 
 
 type alias LinkData msg =
@@ -36,6 +77,9 @@ link route { url, attrs, label } =
 
 type alias Model =
     { count : Int
+    , httpErrMsg : String
+    , gitHubUsernameInput : String
+    , gitHubAccount : Maybe GitHubAcct
     , page : Route
     , screenData : Maybe ScreenData
     }
@@ -44,6 +88,9 @@ type alias Model =
 initialModel : Model
 initialModel =
     { count = 0
+    , gitHubAccount = Nothing
+    , gitHubUsernameInput = ""
+    , httpErrMsg = ""
     , page = Routes.Home
     , screenData = Nothing
     }
@@ -66,6 +113,8 @@ view model =
             appShell
                 [ p [] [ text "Home" ]
                 , counter model.count
+                , githubInput model.gitHubUsernameInput
+                , accountCard model.gitHubAccount
                 ]
 
         Routes.About ->
@@ -90,6 +139,20 @@ counter count =
         ]
 
 
+accountCard : Maybe GitHubAcct -> Html Msg
+accountCard acct =
+    case acct of
+        Just acct ->
+            div []
+                [ a [ href acct.html_url, target "blank" ] [ text "View Profile" ]
+                , p [] [ text (Maybe.withDefault "" acct.location) ]
+                , img [ src acct.avatar_url ] []
+                ]
+
+        Nothing ->
+            div [] []
+
+
 navBar : Route -> Html Msg
 navBar route =
     ul []
@@ -104,6 +167,17 @@ navBar route =
         ]
 
 
+githubInput : String -> Html Msg
+githubInput inputValue =
+    Html.form [ onSubmit (FetchGithubAcct inputValue) ]
+        [ div []
+            [ label [ for "github-input" ] [ text "GitHub username" ]
+            , input [ id "github-input", onInput SetGitHubUsername, autocomplete False, Html.Attributes.required True ] []
+            ]
+        , button [ type_ "submit" ] [ text "Search" ]
+        ]
+
+
 
 {- UPDATE -}
 
@@ -113,9 +187,36 @@ type Msg
     | SetRoute (Maybe Route)
     | Increment
     | Decrement
+    | SetGitHubUsername String
+    | FetchGithubAcct String
+    | GotGitHubAcct GitHubAcct
+    | ShowHttpError Http.Error
     | NavigateTo Route
     | Outside InfoForElm
     | LogErr String
+
+
+httpErrorString : Http.Error -> String
+httpErrorString error =
+    case error of
+        Http.BadUrl text ->
+            "Bad Url: " ++ text
+
+        Http.Timeout ->
+            "Http Timeout"
+
+        Http.NetworkError ->
+            "Network Error"
+
+        Http.BadStatus response ->
+            response.body
+
+        Http.BadPayload message response ->
+            "Bad Http Payload: "
+                ++ toString message
+                ++ " ("
+                ++ toString response.status.code
+                ++ ")"
 
 
 setRoute : Maybe Route -> Model -> ( Model, Cmd Msg )
@@ -162,6 +263,21 @@ update msg model =
 
         Decrement ->
             { model | count = model.count - 1 } ! []
+
+        SetGitHubUsername input ->
+            { model | gitHubUsernameInput = input } ! []
+
+        FetchGithubAcct username ->
+            model ! [ getGitHubAcct username ]
+
+        GotGitHubAcct acct ->
+            { model | gitHubAccount = Just acct } ! []
+
+        ShowHttpError httpError ->
+            { model
+                | httpErrMsg = httpErrorString httpError
+            }
+                ! []
 
         NavigateTo page ->
             {- THE SECOND ARGUMENT TO routeToString IS A JWT FOR VALIDATION, IF NEEDED -}
